@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/1",
+  "package": {
+    "productName": "SeeVideo",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "window": { "all": true },
+      "shell": { "all": true }
+    },
+    "windows": [],
+    "security": {
+      "dangerousRemoteDomainIpcAccess": [
+        {
+          "domain": "ai.byteplus.com",
+          "windows": ["main", "auth-worker"]
+        },
+        {
+          "domain": "console.byteplus.com",
+          "windows": ["auth-worker"]
+        }
+      ]
+    },
+    "bundle": {
+      "active": false,
+      "identifier": "com.seevideo.app"
+    }
+  },
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "devPath": "../web",
+    "distDir": "../web",
+    "withGlobalTauri": true
+  }
+}

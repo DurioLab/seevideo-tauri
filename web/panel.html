@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SeeVideo 控制面板</title>
+    <style>
+      body { margin:0; font:14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Arial; background:#101217; color:#e8ecf1; }
+      .wrap { padding: 14px; }
+      h3 { margin:0 0 10px; font-size:16px; }
+      textarea, select, button { width:100%; box-sizing:border-box; margin-top:8px; border-radius:8px; border:1px solid #2b3340; background:#181c24; color:#e8ecf1; padding:10px; }
+      button { cursor:pointer; }
+      .row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+      .muted { margin-top:10px; font-size:12px; opacity:.8; white-space:pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h3>SeeVideo · 激活与切换</h3>
+      <textarea id="code" rows="5" placeholder="粘贴激活码（可包含多个账号）"></textarea>
+      <button id="import">导入激活码</button>
+      <select id="email"></select>
+      <div class="row">
+        <button id="switch">切换账号</button>
+        <button id="refresh">刷新账号列表</button>
+      </div>
+      <div id="status" class="muted">ready</div>
+    </div>
+    <script src="panel.js"></script>
+  </body>
+</html>
