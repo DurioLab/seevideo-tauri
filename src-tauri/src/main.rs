@@ -5,6 +5,7 @@ mod store;
 
 use serde::Serialize;
 use std::fs;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use tauri::{Manager, WindowUrl};
@@ -15,6 +16,8 @@ use crate::store::{load_store, merge_accounts};
 const LUMINA_URL: &str = "https://ai.byteplus.com/lumina/model-experience/video?mode=video";
 const BYTEPLUS_AUTH_LOGIN_URL: &str = "https://console.byteplus.com/auth/login/";
 const AUTH_WORKER_LABEL: &str = "auth-worker";
+
+static WORKER_LOGIN_DONE: AtomicBool = AtomicBool::new(false);
 
 fn private_key_pem() -> anyhow::Result<String> {
     let base = std::env::current_dir()?
@@ -160,12 +163,123 @@ fn build_login_js(email: &str, password: &str) -> String {
     clickFirstVisibleText(['全部接受', 'Accept all', '接受']);
   }};
 
+  const STATE_KEY = '__sv_worker_state__';
+  const RESET_KEY = '__sv_worker_reset_done__';
+
+  const getSession = (k, fallback='') => {{
+    try {{
+      const v = window.sessionStorage.getItem(k);
+      return v == null ? fallback : v;
+    }} catch (_) {{
+      return fallback;
+    }}
+  }};
+  const setSession = (k, v) => {{
+    try {{ window.sessionStorage.setItem(k, v); }} catch (_) {{}}
+  }};
+
+  const getState = () => getSession(STATE_KEY, 'init');
+  const setState = (v) => setSession(STATE_KEY, v);
+  const getResetDone = () => getSession(RESET_KEY, '') === '1';
+  const setResetDone = () => setSession(RESET_KEY, '1');
+
+  const callLogoutEndpoint = async () => {{
+    const logoutUrl = 'https://ai.byteplus.com/signin/logout';
+    try {{
+      await fetch(logoutUrl, {{ method: 'GET', credentials: 'include', mode: 'no-cors' }});
+      log('logout_fetch_sent', logoutUrl);
+    }} catch (e) {{
+      log('logout_fetch_error', String(e));
+    }}
+    try {{
+      const img = new Image();
+      img.src = `${{logoutUrl}}?ts=${{Date.now()}}`;
+      log('logout_beacon_sent');
+    }} catch (_) {{}}
+  }};
+
+  const clearSessionArtifacts = async () => {{
+    try {{ localStorage.clear(); }} catch (_) {{}}
+    try {{ sessionStorage.clear(); }} catch (_) {{}}
+
+    try {{
+      if (window.indexedDB && typeof window.indexedDB.databases === 'function') {{
+        const dbs = await window.indexedDB.databases();
+        for (const db of dbs || []) {{
+          if (db && db.name) {{
+            try {{ window.indexedDB.deleteDatabase(db.name); }} catch (_) {{}}
+          }}
+        }}
+      }}
+    }} catch (_) {{}}
+
+    try {{
+      if (window.caches && typeof window.caches.keys === 'function') {{
+        const keys = await window.caches.keys();
+        for (const k of keys) {{
+          try {{ await window.caches.delete(k); }} catch (_) {{}}
+        }}
+      }}
+    }} catch (_) {{}}
+
+    try {{
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {{
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) {{
+          try {{ await r.unregister(); }} catch (_) {{}}
+        }}
+      }}
+    }} catch (_) {{}}
+
+    try {{
+      const cookies = document.cookie ? document.cookie.split(';') : [];
+      for (const raw of cookies) {{
+        const name = raw.split('=')[0]?.trim();
+        if (!name) continue;
+        const expires = 'expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/;';
+        document.cookie = `${{name}}=; ${{expires}}`;
+        document.cookie = `${{name}}=; ${{expires}} domain=.byteplus.com;`;
+        document.cookie = `${{name}}=; ${{expires}} domain=console.byteplus.com;`;
+      }}
+    }} catch (_) {{}}
+  }};
+
   log('worker_login_start', document.readyState, window.location.href);
 
   const authUrl = 'https://console.byteplus.com/auth/login/';
-  if (!window.location.href.includes('console.byteplus.com/auth/login')) {{
-    log('navigate_to_auth_login', window.location.href, '=>', authUrl);
-    window.location.href = authUrl;
+  const href = window.location.href;
+  const onConsole = window.location.hostname.endsWith('console.byteplus.com');
+  const onAuthLogin = href.includes('/auth/login');
+
+  if (!getResetDone()) {{
+    log('session_reset_begin', href);
+    await callLogoutEndpoint();
+    await sleep(600);
+    await clearSessionArtifacts();
+    setResetDone();
+    setState('init');
+    log('session_reset_done', window.location.href);
+  }}
+
+  const state = getState();
+  if ((state === 'submitted' || state === 'success') && !onAuthLogin) {{
+    setState('success');
+    log('login_success_page_detected', window.location.href);
+    bridge('worker_sync_main');
+    bridge('worker_close_ok');
+    return;
+  }}
+
+  if (!onConsole || !onAuthLogin) {{
+    if (state === 'init' || state === 'filling') {{
+      log('navigate_to_auth_login', window.location.href, '=>', authUrl);
+      window.location.href = authUrl;
+      return;
+    }}
+  }}
+
+  if (state === 'submitted') {{
+    log('awaiting_post_login_redirect', window.location.href);
     return;
   }}
 
@@ -173,6 +287,7 @@ fn build_login_js(email: &str, password: &str) -> String {
     return;
   }}
   window.__sv_worker_login_started__ = true;
+  setState('filling');
 
   maybeDismissCookie();
   log('auth_page_ready', window.location.href);
@@ -232,6 +347,7 @@ fn build_login_js(email: &str, password: &str) -> String {
       }}
 
       log('login_submit', i + 1, 'clicked', ret.by);
+      setState('submitted');
       bridge('worker_login_submitted');
       await sleep(6000);
       log('post_submit_wait_done', window.location.href);
@@ -256,6 +372,7 @@ fn build_login_js(email: &str, password: &str) -> String {
   }}
 
   log('login_form_timeout');
+  setState('failed');
   bridge('worker_login_form_timeout');
 }})();"#
     )
@@ -359,11 +476,20 @@ fn switch_account(app: tauri::AppHandle, email: String) -> Result<(), String> {
     eprintln!("[SeeVideoAuth] switch_account visible auth worker ready");
 
     // 延迟+重试注入脚本，确保在 auth-worker 真正加载目标页面后执行。
+    WORKER_LOGIN_DONE.store(false, Ordering::SeqCst);
     let js = build_login_js(&acct.email, &acct.password);
     let app_handle = app.clone();
     thread::spawn(move || {
         for attempt in 1..=15 {
+            if WORKER_LOGIN_DONE.load(Ordering::SeqCst) {
+                eprintln!("[SeeVideoAuth] switch_account stop eval retries: done flag set");
+                break;
+            }
             thread::sleep(Duration::from_millis(900));
+            if WORKER_LOGIN_DONE.load(Ordering::SeqCst) {
+                eprintln!("[SeeVideoAuth] switch_account stop eval retries after sleep: done flag set");
+                break;
+            }
             let Some(worker) = app_handle.get_window(AUTH_WORKER_LABEL) else {
                 eprintln!("[SeeVideoAuth] switch_account worker missing before eval attempt={}", attempt);
                 continue;
@@ -419,12 +545,18 @@ fn frontend_auth_log(app: tauri::AppHandle, message: String) {
     eprintln!("[SeeVideoAuth][Front] {}", message);
 
     if message.contains("[worker] worker_login_submitted") {
+        WORKER_LOGIN_DONE.store(true, Ordering::SeqCst);
         sync_main_to_lumina(&app, "worker_login_submitted");
     }
     if message.contains("[worker] worker_sync_main") {
+        WORKER_LOGIN_DONE.store(true, Ordering::SeqCst);
         sync_main_to_lumina(&app, "worker_sync_main");
     }
+    if message.contains("[worker] worker_login_form_timeout") {
+        WORKER_LOGIN_DONE.store(true, Ordering::SeqCst);
+    }
     if message.contains("[worker] worker_close_ok") {
+        WORKER_LOGIN_DONE.store(true, Ordering::SeqCst);
         if let Some(worker) = app.get_window(AUTH_WORKER_LABEL) {
             eprintln!("[SeeVideoAuth] closing auth worker after worker_close_ok");
             let _ = worker.close();
