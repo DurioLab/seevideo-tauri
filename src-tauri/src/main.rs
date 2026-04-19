@@ -11,13 +11,26 @@ use std::time::Duration;
 use tauri::{Manager, WindowUrl};
 
 use crate::license::{decode_activation_code, LicenseAccount};
-use crate::store::{load_store, merge_accounts};
+use crate::store::{
+    get_last_selected_email, load_store, merge_accounts, set_last_selected_email,
+};
 
 const LUMINA_URL: &str = "https://ai.byteplus.com/lumina/model-experience/video?mode=video";
 const BYTEPLUS_AUTH_LOGIN_URL: &str = "https://console.byteplus.com/auth/login/";
 const AUTH_WORKER_LABEL: &str = "auth-worker";
 
 static WORKER_LOGIN_DONE: AtomicBool = AtomicBool::new(false);
+
+fn should_show_auth_worker() -> bool {
+    matches!(
+        std::env::var("SEEVIDEO_SHOW_AUTH_WORKER")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str(),
+        "1" | "true" | "yes" | "on"
+    )
+}
 
 fn private_key_pem() -> anyhow::Result<String> {
     let base = std::env::current_dir()?
@@ -266,6 +279,7 @@ fn build_login_js(email: &str, password: &str) -> String {
     setState('success');
     log('login_success_page_detected', window.location.href);
     bridge('worker_sync_main');
+    await sleep(5000);
     bridge('worker_close_ok');
     return;
   }}
@@ -434,6 +448,20 @@ fn list_accounts() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+fn get_last_selected_account() -> Result<Option<String>, String> {
+    eprintln!("[SeeVideoAuth] get_last_selected_account called");
+    let email = get_last_selected_email().map_err(|e| e.to_string())?;
+    eprintln!("[SeeVideoAuth] get_last_selected_account done: {:?}", email);
+    Ok(email)
+}
+
+#[tauri::command]
+fn set_last_selected_account(email: String) -> Result<(), String> {
+    eprintln!("[SeeVideoAuth] set_last_selected_account called: {}", email);
+    set_last_selected_email(Some(email)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn switch_account(app: tauri::AppHandle, email: String) -> Result<(), String> {
     eprintln!("[SeeVideoAuth] switch_account called: {}", email);
     let st = load_store().map_err(|e| e.to_string())?;
@@ -456,8 +484,11 @@ fn switch_account(app: tauri::AppHandle, email: String) -> Result<(), String> {
         let _ = old_worker.close();
     }
 
+    let show_auth_worker = should_show_auth_worker();
+    let worker_visibility_label = if show_auth_worker { "VISIBLE" } else { "HIDDEN" };
     eprintln!(
-        "[SeeVideoAuth] switch_account creating VISIBLE auth worker: {}",
+        "[SeeVideoAuth] switch_account creating {} auth worker: {}",
+        worker_visibility_label,
         BYTEPLUS_AUTH_LOGIN_URL
     );
     let _auth_worker = tauri::WindowBuilder::new(
@@ -466,14 +497,17 @@ fn switch_account(app: tauri::AppHandle, email: String) -> Result<(), String> {
         WindowUrl::External(BYTEPLUS_AUTH_LOGIN_URL.parse().expect("valid url")),
     )
     .title("SeeVideoAuthWorker")
-    .visible(true)
-    .skip_taskbar(false)
+    .visible(show_auth_worker)
+    .skip_taskbar(!show_auth_worker)
     .build()
     .map_err(|e| {
         eprintln!("[SeeVideoAuth] switch_account worker build failed: {}", e);
         e.to_string()
     })?;
-    eprintln!("[SeeVideoAuth] switch_account visible auth worker ready");
+    eprintln!(
+        "[SeeVideoAuth] switch_account {} auth worker ready",
+        if show_auth_worker { "visible" } else { "hidden" }
+    );
 
     // 延迟+重试注入脚本，确保在 auth-worker 真正加载目标页面后执行。
     WORKER_LOGIN_DONE.store(false, Ordering::SeqCst);
@@ -545,7 +579,6 @@ fn frontend_auth_log(app: tauri::AppHandle, message: String) {
     eprintln!("[SeeVideoAuth][Front] {}", message);
 
     if message.contains("[worker] worker_login_submitted") {
-        WORKER_LOGIN_DONE.store(true, Ordering::SeqCst);
         sync_main_to_lumina(&app, "worker_login_submitted");
     }
     if message.contains("[worker] worker_sync_main") {
@@ -576,6 +609,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             import_activation_code,
             list_accounts,
+            get_last_selected_account,
+            set_last_selected_account,
             switch_account,
             cleanup_layout,
             frontend_auth_log,

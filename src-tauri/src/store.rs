@@ -11,6 +11,7 @@ use crate::license::LicenseAccount;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccountStore {
     pub accounts: Vec<LicenseAccount>,
+    pub last_selected_email: Option<String>,
 }
 
 fn store_path() -> PathBuf {
@@ -103,4 +104,81 @@ pub fn merge_accounts(new_accounts: &[LicenseAccount]) -> anyhow::Result<usize> 
     }
     save_store(&st)?;
     Ok(added)
+}
+
+pub fn get_last_selected_email() -> anyhow::Result<Option<String>> {
+    Ok(load_store()?.last_selected_email)
+}
+
+pub fn set_last_selected_email(email: Option<String>) -> anyhow::Result<()> {
+    let mut st = load_store()?;
+    st.last_selected_email = email
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    save_store(&st)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    static STORE_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn sample_account(email: &str) -> LicenseAccount {
+        LicenseAccount {
+            email: email.to_string(),
+            password: "pw".to_string(),
+            status: "active".to_string(),
+            registertime: "2026-04-19T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn saves_and_loads_last_selected_email() {
+        let _guard = STORE_TEST_LOCK.lock().unwrap();
+        let temp_home = tempfile::tempdir().unwrap();
+        let old_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", temp_home.path());
+
+        save_store(&AccountStore {
+            accounts: vec![sample_account("b@example.com")],
+            last_selected_email: Some("b@example.com".to_string()),
+        })
+        .unwrap();
+
+        let loaded = load_store().unwrap();
+        assert_eq!(loaded.last_selected_email.as_deref(), Some("b@example.com"));
+
+        match old_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+    }
+
+    #[test]
+    fn merge_accounts_preserves_existing_last_selected_email() {
+        let _guard = STORE_TEST_LOCK.lock().unwrap();
+        let temp_home = tempfile::tempdir().unwrap();
+        let old_home = std::env::var_os("HOME");
+        std::env::set_var("HOME", temp_home.path());
+
+        save_store(&AccountStore {
+            accounts: vec![sample_account("b@example.com")],
+            last_selected_email: Some("b@example.com".to_string()),
+        })
+        .unwrap();
+
+        let added = merge_accounts(&[sample_account("a@example.com")]).unwrap();
+        assert_eq!(added, 1);
+
+        let loaded = load_store().unwrap();
+        assert_eq!(loaded.last_selected_email.as_deref(), Some("b@example.com"));
+        assert_eq!(loaded.accounts.len(), 2);
+
+        match old_home {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+    }
 }

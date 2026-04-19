@@ -279,8 +279,12 @@
         box-shadow:0 0 0 1px rgba(0,0,0,.2) inset;
       }
       #${NAV_ID} .sv-auth-dot.status-failed{background:#ef4444;box-shadow:0 0 10px rgba(239,68,68,.5)}
-      #${NAV_ID} .sv-auth-dot.status-loading{background:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,.5)}
+      #${NAV_ID} .sv-auth-dot.status-loading{background:#f59e0b;box-shadow:0 0 10px rgba(245,158,11,.5);animation:sv-auth-loading-pulse .8s ease-in-out infinite}
       #${NAV_ID} .sv-auth-dot.status-success{background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,.5)}
+      @keyframes sv-auth-loading-pulse{
+        0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 12px rgba(245,158,11,.6)}
+        50%{opacity:.35;transform:scale(.82);box-shadow:0 0 3px rgba(245,158,11,.18)}
+      }
       #${NAV_ID} .sv-auth-text{font-size:12px;opacity:.92;min-width:56px}
       #${NAV_ID} button,#${NAV_ID} select{
         height:30px;border:1px solid rgba(255,255,255,.18);border-radius:8px;
@@ -565,6 +569,42 @@
     if (old && old.parentNode) old.parentNode.removeChild(old);
   };
 
+  const normalizeEmail = (email) => String(email || '').trim();
+
+  const loadLastSelectedAccount = async () => {
+    try {
+      const email = await invokeWithTimeout('get_last_selected_account', {}, 6000);
+      const normalized = normalizeEmail(email);
+      authLog('last_selected_loaded', normalized || '(empty)');
+      window.__sv_last_selected_email__ = normalized || '';
+      return normalized;
+    } catch (e) {
+      authLog('last_selected_load_error', String(e));
+      return '';
+    }
+  };
+
+  const saveLastSelectedAccount = async (email, reason = 'unknown') => {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return false;
+    try {
+      await invokeWithTimeout('set_last_selected_account', { email: normalized }, 6000);
+      window.__sv_last_selected_email__ = normalized;
+      authLog('last_selected_saved', reason, normalized);
+      return true;
+    } catch (e) {
+      authLog('last_selected_save_error', reason, normalized, String(e));
+      return false;
+    }
+  };
+
+  const choosePreferredAccount = (emails, preferredEmail = '') => {
+    const list = Array.isArray(emails) ? emails.map(normalizeEmail).filter(Boolean) : [];
+    const preferred = normalizeEmail(preferredEmail);
+    if (preferred && list.includes(preferred)) return preferred;
+    return list[0] || '';
+  };
+
   const refreshAccountOptions = async (reason = 'unknown') => {
     const select = document.getElementById('sv_account_select');
     if (!select) {
@@ -581,6 +621,7 @@
         opt.value = '';
         opt.textContent = '账号列表（空）';
         select.appendChild(opt);
+        window.__sv_last_selected_email__ = '';
         return [];
       }
       emails.forEach((email) => {
@@ -589,6 +630,12 @@
         opt.textContent = email;
         select.appendChild(opt);
       });
+      const preferred = choosePreferredAccount(emails, window.__sv_last_selected_email__ || '');
+      if (preferred) {
+        select.value = preferred;
+        window.__sv_last_selected_email__ = preferred;
+        authLog('accounts_refresh_selected', reason, preferred);
+      }
       return emails;
     } catch (e) {
       authLog('accounts_refresh_error', reason, String(e));
@@ -652,17 +699,20 @@
           await runWithLoadingGate('激活并登录中，请稍候…', async () => {
             const importResult = await invokeWithTimeout('import_activation_code', { code }, 12000);
             authLog('activate_import_ok', importResult);
+            const existingPreferred = window.__sv_last_selected_email__ || await loadLastSelectedAccount();
             const emails = await refreshAccountOptions('activate_submit');
             authLog('activate_accounts', emails.length, emails);
             if (emails.length > 0) {
-              const firstEmail = emails[0];
-              authLog('activate_switch_first_begin', firstEmail);
+              const targetEmail = choosePreferredAccount(emails, existingPreferred);
+              authLog('activate_switch_target', targetEmail, existingPreferred || '(none)');
               const sel = document.getElementById('sv_account_select');
-              if (sel) sel.value = firstEmail;
-              const switched = await triggerSwitchAndWait(firstEmail);
-              authLog('activate_switch_first_done', firstEmail, switched);
+              if (sel) sel.value = targetEmail;
+              await saveLastSelectedAccount(targetEmail, 'activate_submit');
+              authLog('activate_switch_first_begin', targetEmail);
+              const switched = await triggerSwitchAndWait(targetEmail);
+              authLog('activate_switch_first_done', targetEmail, switched);
               if (!switched) {
-                authLog('activate_switch_first_failed', firstEmail);
+                authLog('activate_switch_first_failed', targetEmail);
               }
             } else {
               authLog('activate_no_accounts_after_import');
@@ -686,6 +736,8 @@
         const email = select.value;
         if (!email) return;
         authLog('manual_switch_select', email);
+        window.__sv_last_selected_email__ = email;
+        await saveLastSelectedAccount(email, 'manual_switch');
         try {
           await runWithLoadingGate('正在切换账号，请稍候…', async () => {
             await triggerSwitchAndWait(email);
@@ -725,6 +777,7 @@
     wireEvents();
     forceTopNavInteractive();
 
+    const lastSelected = await loadLastSelectedAccount();
     let emails = await refreshAccountOptions('boot');
     if ((!emails || emails.length === 0)) {
       authLog('boot_refresh_empty_retry_list');
@@ -747,6 +800,12 @@
               opt.textContent = email;
               sel.appendChild(opt);
             });
+            const preferred = choosePreferredAccount(emails, lastSelected || window.__sv_last_selected_email__ || '');
+            if (preferred) {
+              sel.value = preferred;
+              window.__sv_last_selected_email__ = preferred;
+              authLog('boot_fallback_selected', preferred);
+            }
           }
         }
       } catch (e) {
@@ -758,12 +817,13 @@
 
     // 已有账号但未登录时，启动后自动发起一次登录，避免“有账号但无登录动作”。
     if (emails.length > 0 && !isLikelyLoggedIn()) {
-      const email = emails[0];
+      const email = choosePreferredAccount(emails, lastSelected || window.__sv_last_selected_email__ || '');
       authLog('boot_auto_switch', email);
       try {
         await runWithLoadingGate('检测到账号，正在自动登录…', async () => {
           const sel = document.getElementById('sv_account_select');
           if (sel) sel.value = email;
+          await saveLastSelectedAccount(email, 'boot_auto_switch');
           await triggerSwitchAndWait(email);
         }, 12000);
       } catch (e) {
