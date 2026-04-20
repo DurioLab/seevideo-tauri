@@ -158,11 +158,13 @@
       }
       #${MODAL_ID} .sv-actions{margin-top:10px;display:flex;justify-content:flex-end;gap:8px}
       #${MODAL_ID} .sv-close{
-        position:absolute;right:10px;top:10px;width:28px;height:28px;line-height:26px;
+        position:absolute;right:10px;top:10px;width:28px;height:28px;
+        display:flex;align-items:center;justify-content:center;
         border-radius:8px;border:1px solid rgba(255,255,255,.2);
-        background:rgba(255,255,255,.08);color:#fff;text-align:center;cursor:pointer;
-        z-index:2;
+        background:rgba(255,255,255,.08);color:#fff;cursor:pointer;
+        z-index:2;padding:0;
       }
+      #${MODAL_ID} .sv-close svg{width:14px;height:14px;display:block,margin-left:5px;margin-top:5px;}
       #${MODAL_ID} button{
         height:32px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.2);
         background:rgba(255,255,255,.08);color:#fff;
@@ -212,7 +214,11 @@
     modal.style.display = 'none';
     modal.innerHTML = `
       <div class="sv-box">
-        <button class="sv-close" id="sv_activate_close" title="关闭">×</button>
+        <button class="sv-close" id="sv_activate_close" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
         <textarea id="sv_code_input" placeholder="输入激活码"></textarea>
         <div class="sv-actions">
           <button id="sv_activate_confirm">确认</button>

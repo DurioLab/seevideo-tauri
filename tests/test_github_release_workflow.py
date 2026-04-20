@@ -81,14 +81,22 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
 
     def test_hide_layout_rewrites_lumina_headline(self):
         inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
-        self.assertIn("'使用Lumina点亮您的创作'", inject_js)
-        self.assertIn("'开启您的创作之旅'", inject_js)
+        self.assertIn("const h1 = document.querySelector('.model-experience-main-content h1')", inject_js)
+        self.assertIn("h1.textContent = '开启您的创作之旅'", inject_js)
 
     def test_hide_layout_runs_during_tick_boot_and_runtime(self):
         inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
         self.assertRegex(inject_js, r"window\.__sv_tick__\s*=\s*\(reason = 'external'\) => \{[\s\S]*?hideLayout\(\);")
         self.assertRegex(inject_js, r"const boot = async \(\) => \{[\s\S]*?hideLayout\(\);")
         self.assertRegex(inject_js, r"setInterval\(\(\) => \{[\s\S]*?hideLayout\(\);[\s\S]*?\}, 1200\)")
+
+    def test_activation_modal_close_button_uses_centered_svg_icon(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertIn('display:flex;align-items:center;justify-content:center;', inject_js)
+        self.assertIn('.sv-close svg{width:14px;height:14px;display:block}', inject_js)
+        self.assertIn('<svg', inject_js)
+        self.assertIn('viewBox="0 0 24 24"', inject_js)
+        self.assertNotIn('>×</button>', inject_js)
 
 
 if __name__ == '__main__':
