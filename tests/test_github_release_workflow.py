@@ -37,6 +37,9 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         cargo_toml = (REPO_ROOT / 'src-tauri' / 'Cargo.toml').read_text(encoding='utf-8')
         self.assertRegex(cargo_toml, r'(?ms)^\[features\]\s+.*^custom-protocol\s*=\s*\[\s*"tauri/custom-protocol"\s*\]')
 
+    def test_windows_icon_exists_for_tauri_bundle(self):
+        self.assertTrue((REPO_ROOT / 'src-tauri' / 'icons' / 'icon.ico').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
