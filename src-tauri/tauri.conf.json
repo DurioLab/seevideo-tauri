@@ -26,7 +26,8 @@
     "bundle": {
       "active": true,
       "identifier": "com.seevideo.app",
-      "targets": ["dmg", "msi", "nsis"]
+      "targets": ["dmg", "msi", "nsis"],
+      "icon": ["icons/icon.png", "icons/icon.ico"]
     }
   },
   "build": {
