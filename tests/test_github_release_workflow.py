@@ -33,6 +33,10 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         config = json.loads(TAURI_CONFIG_PATH.read_text(encoding='utf-8'))
         self.assertTrue(config['tauri']['bundle']['active'])
 
+    def test_tauri_cargo_manifest_defines_custom_protocol_feature(self):
+        cargo_toml = (REPO_ROOT / 'src-tauri' / 'Cargo.toml').read_text(encoding='utf-8')
+        self.assertRegex(cargo_toml, r'(?ms)^\[features\]\s+.*^custom-protocol\s*=\s*\[\s*"tauri/custom-protocol"\s*\]')
+
 
 if __name__ == '__main__':
     unittest.main()
