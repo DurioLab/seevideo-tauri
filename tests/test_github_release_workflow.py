@@ -58,6 +58,38 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         icons = config['tauri']['bundle'].get('icon', [])
         self.assertIn('icons/icon.icns', icons)
 
+    def test_hide_layout_updates_lumina_structure(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertIn("document.querySelectorAll('.ba-sider').forEach((el) => {", inject_js)
+        self.assertIn("el.style.width = '0';", inject_js)
+        self.assertIn("const wrapper = document.querySelector('.ba-generate-framework-main-content-wrapper');", inject_js)
+        self.assertIn("wrapper.classList.remove('flex-none');", inject_js)
+        self.assertIn("wrapper.classList.add('flex-1');", inject_js)
+        self.assertIn("const first = wrapper.querySelector(':scope > div:first-child') || wrapper.firstElementChild;", inject_js)
+        self.assertIn("first.style.width = '100%';", inject_js)
+        self.assertIn("document.body.style.paddingTop = '0';", inject_js)
+        self.assertIn("document.body.style.overflowY = 'hidden';", inject_js)
+
+    def test_hide_layout_hides_second_and_third_framework_children(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertIn("const framework = document.querySelector('.ba-generate-framework');", inject_js)
+        self.assertIn("const second = framework.children[1];", inject_js)
+        self.assertIn("const third = framework.children[2];", inject_js)
+        self.assertIn("second.classList.add('hidden');", inject_js)
+        self.assertIn("third.classList.add('hidden');", inject_js)
+        self.assertIn("const toHide = ['智能视频', '自由创作'];", inject_js)
+
+    def test_hide_layout_rewrites_lumina_headline(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertIn("'使用Lumina点亮您的创作'", inject_js)
+        self.assertIn("'开启您的创作之旅'", inject_js)
+
+    def test_hide_layout_runs_during_tick_boot_and_runtime(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertRegex(inject_js, r"window\.__sv_tick__\s*=\s*\(reason = 'external'\) => \{[\s\S]*?hideLayout\(\);")
+        self.assertRegex(inject_js, r"const boot = async \(\) => \{[\s\S]*?hideLayout\(\);")
+        self.assertRegex(inject_js, r"setInterval\(\(\) => \{[\s\S]*?hideLayout\(\);[\s\S]*?\}, 1200\)")
+
 
 if __name__ == '__main__':
     unittest.main()

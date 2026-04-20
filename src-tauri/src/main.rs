@@ -14,7 +14,7 @@ use crate::store::{
     get_last_selected_email, load_store, merge_accounts, set_last_selected_email,
 };
 
-const LUMINA_URL: &str = "https://ai.byteplus.com/lumina/model-experience/video?mode=video";
+const LUMINA_URL: &str = "https://ai.byteplus.com/lumina/model-experience/video?mode=video&lumina_lng=zh";
 const BYTEPLUS_AUTH_LOGIN_URL: &str = "https://console.byteplus.com/auth/login/";
 const AUTH_WORKER_LABEL: &str = "auth-worker";
 

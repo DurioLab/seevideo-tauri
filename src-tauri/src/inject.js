@@ -51,210 +51,57 @@
     });
   };
 
-  const hideEl = (el) => {
-    if (!el) return;
-    if (el.id === NAV_ID || el.id === MODAL_ID) return;
-    el.style.display = 'none';
-    el.style.width = '0';
-    el.style.minWidth = '0';
-    el.style.maxWidth = '0';
-    el.style.opacity = '0';
-    el.style.pointerEvents = 'none';
-  };
-
   const hideLayout = () => {
-    const selectors = [
-      '.left-nav', '.left-sidebar', '.bd-layout-sider-left', '.sider-left',
-      '.right-panel', '.right-sidebar', '.bd-layout-sider-right', '.works-list', '.history-list',
-      '[class*="sidebar"]', '[class*="sider"]', '[class*="left-nav"]', '[class*="right-panel"]'
-    ];
-
-    const hiddenNodes = [];
-    const hideAndCollect = (el) => {
-      if (!el) return;
-      const before = el.getBoundingClientRect();
-      hideEl(el);
-      if (before.width > 0 || before.height > 0) hiddenNodes.push(el);
-    };
-
-    selectors.forEach((sel) => document.querySelectorAll(sel).forEach(hideAndCollect));
-
-    // left rail heuristic
-    document.querySelectorAll('div,aside,section,nav').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-      const cls = `${el.className || ''} ${el.id || ''}`.toLowerCase();
-      if (r.left < 24 && r.width > 30 && r.width < 260 && r.height > window.innerHeight * 0.55) {
-        if (cls.includes('left') || cls.includes('nav') || cls.includes('sider') || cls.includes('sidebar')) {
-          hideAndCollect(el);
-        }
-      }
+    document.querySelectorAll('.ba-sider').forEach((el) => {
+      el.style.width = '0';
     });
 
-    // right panel heuristic (text + geometry). Some builds render empty right pane; geometry fallback handles that.
-    document.querySelectorAll('div,aside,section').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-
-      const nearRightEdge = r.right > window.innerWidth - 8;
-      const rightWidth = r.width > 200 && r.width < 760;
-      const tallEnough = r.height > window.innerHeight * 0.42;
-      const mostlyRight = r.left > window.innerWidth * 0.55;
-
-      if (!(nearRightEdge && rightWidth && tallEnough && mostlyRight)) return;
-
-      const txt = (el.innerText || '').toLowerCase();
-      const cls = `${el.className || ''} ${el.id || ''}`.toLowerCase();
-      const textMatch = (txt.includes('explore') && txt.includes('history')) || txt.includes('prompt keywords');
-      const classMatch = cls.includes('right') || cls.includes('panel') || cls.includes('sider') || cls.includes('sidebar') || cls.includes('explore') || cls.includes('history');
-
-      if (el.id === NAV_ID || el.id === MODAL_ID) return;
-      if (el.querySelector(`#${NAV_ID}`) || el.querySelector(`#${MODAL_ID}`)) return;
-      if (el.querySelector('.ba-generate-framework-main-content-wrapper')) return;
-
-      if (textMatch || classMatch) {
-        hideAndCollect(el);
-      }
+    document.querySelectorAll('.lumi-feedback-entry').forEach((el) => {
+      el.classList.add('hidden');
     });
 
-    // Splitter / divider near right side (often keeps center width constrained)
-    document.querySelectorAll('div,span,aside,section').forEach((el) => {
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return;
-      const cls = `${el.className || ''} ${el.id || ''}`.toLowerCase();
-      const looksLikeDivider = (r.width <= 12 && r.height > window.innerHeight * 0.45 && r.left > window.innerWidth * 0.5)
-        || cls.includes('split') || cls.includes('resize') || cls.includes('divider');
-      if (looksLikeDivider) hideAndCollect(el);
-    });
-
-    // Normalize parent layout containers so center area actually expands after sidebars are hidden.
-    const parents = new Set();
-    hiddenNodes.forEach((n) => {
-      let p = n.parentElement;
-      for (let i = 0; i < 4 && p; i += 1) {
-        parents.add(p);
-        p = p.parentElement;
-      }
-    });
-
-    parents.forEach((p) => {
-      if (!p || p.id === NAV_ID || p.id === MODAL_ID) return;
-      const cs = window.getComputedStyle(p);
-      const cls = `${p.className || ''} ${p.id || ''}`.toLowerCase();
-      const isLikelyLayout = cls.includes('layout') || cls.includes('wrapper') || cls.includes('content') || cls.includes('main');
-      if (!isLikelyLayout) return;
-
-      if (cs.display.includes('grid')) {
-        p.style.gridTemplateColumns = '1fr';
-        p.style.gridAutoColumns = '1fr';
-        p.style.columnGap = '0';
-        p.style.gap = '0';
-      }
-
-      p.style.width = '100%';
-      p.style.maxWidth = 'none';
-      p.style.minWidth = '0';
-      p.style.marginLeft = '0';
-      p.style.marginRight = '0';
-
-      if (cs.display.includes('flex')) {
-        Array.from(p.children || []).forEach((child) => {
-          if (!child || child.id === NAV_ID || child.id === MODAL_ID) return;
-          if (child.getAttribute('data-sv-hidden') === '1') return;
-          child.style.flex = '1 1 auto';
-          child.style.minWidth = '0';
-        });
-      }
-    });
-
-    ['.bd-layout-content', '.main-content', '.content', '.center-panel', 'main', '[class*="content"]'].forEach((sel) => {
-      document.querySelectorAll(sel).forEach((el) => {
-        if (el.id === NAV_ID || el.id === MODAL_ID) return;
-        el.style.width = '100%';
-        el.style.maxWidth = 'none';
-        el.style.minWidth = '0';
-        el.style.marginLeft = '0';
-        el.style.marginRight = '0';
-      });
-    });
-
-    // Keep page itself non-scrollable; let content area handle scroll so bottom input stays pinned.
-    document.documentElement.style.width = '100%';
-    const body = document.body;
-    if (body) {
-      body.style.width = '100%';
-      body.style.maxWidth = 'none';
-      body.style.overflow = 'hidden';
+    const h1 = document.querySelector('.model-experience-main-content h1')
+    if(h1){
+      h1.textContent = '开启您的创作之旅'
     }
-    document.documentElement.style.overflow = 'hidden';
 
-    // Force Lumina main wrapper first child to fill available width.
     const wrapper = document.querySelector('.ba-generate-framework-main-content-wrapper');
     if (wrapper) {
-      wrapper.style.width = '100%';
-      wrapper.style.maxWidth = 'none';
-      wrapper.style.minWidth = '0';
-      wrapper.style.marginLeft = '0';
-      wrapper.style.marginRight = '0';
-      wrapper.style.position = wrapper.style.position || 'relative';
+      wrapper.classList.remove('flex-none');
+      wrapper.classList.add('flex-1');
 
       const first = wrapper.querySelector(':scope > div:first-child') || wrapper.firstElementChild;
       if (first) {
         first.style.width = '100%';
-        first.style.maxWidth = 'none';
-        first.style.minWidth = '0';
-        first.style.flex = '1 1 auto';
-        first.style.marginLeft = '0';
-        first.style.marginRight = '0';
-        first.style.overflow = 'visible';
       }
     }
 
-    // Keep bottom input area pinned and remove first two bottom buttons.
-    const allEls = Array.from(document.querySelectorAll('div,section'));
-    const bottomCandidates = allEls.filter((el) => {
-      if (!el || el.id === MODAL_ID || el.id === NAV_ID) return false;
-      if (el.closest(`#${MODAL_ID}`) || el.closest(`#${NAV_ID}`)) return false;
-      const cs = window.getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      const z = Number.parseInt(cs.zIndex || '0', 10);
-      const nearBottom = Math.abs(window.innerHeight - r.bottom) <= 8;
-      const wide = r.width > window.innerWidth * 0.6;
-      const hasInput = !!el.querySelector('textarea,input,[contenteditable="true"]');
-      return hasInput && wide && nearBottom && (cs.position === 'absolute' || cs.position === 'fixed' || z >= 100);
-    });
+    const framework = document.querySelector('.ba-generate-framework');
+    if (framework) {
+      const second = framework.children[1];
+      const third = framework.children[2];
+      if (second) {
+        second.classList.add('hidden');
+      }
+      if (third) {
+        third.classList.add('hidden');
+      }
+    }
 
-    bottomCandidates.forEach((bar) => {
-      bar.style.zIndex = '101';
-      bar.style.position = 'absolute';
-      bar.style.bottom = '0px';
-      bar.style.left = '0px';
-      bar.style.right = '0px';
-      bar.style.width = '100%';
-      bar.style.maxWidth = '100%';
-      bar.style.overflow = 'visible';
-
-      const btns = Array.from(bar.querySelectorAll('button')).filter((b) => {
-        const t = (b.innerText || '').trim().toLowerCase();
-        if (t === '激活') return false;
-        return true;
-      });
-      btns.slice(0, 2).forEach((b) => {
-        b.style.display = 'none';
-      });
-    });
-
-    // Explicitly remove first two bottom mode buttons by text (more stable than index-only).
     const toHide = ['智能视频', '自由创作'];
     Array.from(document.querySelectorAll('button,[role="button"]')).forEach((el) => {
       const txt = (el.innerText || '').trim();
       if (!toHide.some((t) => txt.startsWith(t))) return;
       const r = el.getBoundingClientRect();
-      if (r.top < window.innerHeight * 0.55) return; // avoid top nav controls
+      if (r.top < window.innerHeight * 0.55) return;
       el.style.display = 'none';
     });
 
-    if (document.body) document.body.style.paddingTop = '52px';
+    if (document.body) {
+      document.body.style.paddingTop = '0';
+      document.body.style.overflowY = 'hidden';
+    }
+    document.documentElement.style.overflowY = 'hidden';
   };
 
   const ensureStyle = () => {
@@ -761,6 +608,7 @@
       ensureContentGate();
       wireEvents();
       forceTopNavInteractive();
+      hideLayout();
       refreshContentGateByAuthState();
     } catch (e) {
       authLog('tick_error', reason, String(e));
@@ -776,6 +624,7 @@
     ensureContentGate();
     wireEvents();
     forceTopNavInteractive();
+    hideLayout();
 
     const lastSelected = await loadLastSelectedAccount();
     let emails = await refreshAccountOptions('boot');
@@ -843,7 +692,7 @@
       authLog('boot_failed', String(e));
     });
 
-    // 轻量保活：只维持导航和状态，不做布局改写。
+    // 轻量保活：维持导航、状态和布局修正。
     if (!window.__sv_timer__) {
       window.__sv_timer__ = setInterval(() => {
         try {
@@ -852,6 +701,7 @@
           ensureModal();
           wireEvents();
           forceTopNavInteractive();
+          hideLayout();
           refreshContentGateByAuthState();
         } catch (e) {
           authLog('tick_error', 'runtime_timer', String(e));
