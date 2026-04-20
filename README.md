@@ -27,8 +27,19 @@ cargo run
 
 ## 打包（建议）
 
+本地手动构建：
+
 cd src-tauri
 cargo build --release
+
+GitHub 自动化构建：
+
+- 已新增 `.github/workflows/release.yml`
+- 推送 `v*` tag（如 `v0.1.0`）后会自动在 GitHub Actions 上构建：
+  - macOS：`aarch64-apple-darwin` → `.dmg`
+  - Windows：`x86_64-pc-windows-msvc` → `.msi` / `NSIS .exe`
+- 也支持在 Actions 页面手动触发 `Release` workflow
+- tag 构建完成后会自动创建 GitHub Release 并上传安装包
 
 并确保：
 - 关闭调试符号（release）
