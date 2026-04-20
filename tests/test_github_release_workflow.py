@@ -42,6 +42,14 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn('std::env::current_dir()', main_rs)
         self.assertIn('include_str!("../../keys/license_priv.pem")', main_rs)
 
+    def test_inject_layout_cleanup_targets_requested_selectors(self):
+        inject_js = (REPO_ROOT / 'src-tauri' / 'src' / 'inject.js').read_text(encoding='utf-8')
+        self.assertIn('.ba-sider', inject_js)
+        self.assertIn('.ba-generate-framework-main-content-wrapper', inject_js)
+        self.assertIn('classList.add(\'hidden\')', inject_js)
+        self.assertIn("classList.add('flex-1')", inject_js)
+        self.assertIn("style.width = '100%'", inject_js)
+
     def test_windows_icon_exists_for_tauri_bundle(self):
         self.assertTrue((REPO_ROOT / 'src-tauri' / 'icons' / 'icon.ico').exists())
 
