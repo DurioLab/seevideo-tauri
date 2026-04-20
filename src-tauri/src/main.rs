@@ -4,7 +4,6 @@ mod license;
 mod store;
 
 use serde::Serialize;
-use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
@@ -33,12 +32,7 @@ fn should_show_auth_worker() -> bool {
 }
 
 fn private_key_pem() -> anyhow::Result<String> {
-    let base = std::env::current_dir()?
-        .join("..")
-        .join("keys")
-        .join("license_priv.pem");
-    let txt = fs::read_to_string(base)?;
-    Ok(txt)
+    Ok(include_str!("../../keys/license_priv.pem").to_string())
 }
 
 #[derive(Serialize)]

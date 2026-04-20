@@ -37,6 +37,11 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         cargo_toml = (REPO_ROOT / 'src-tauri' / 'Cargo.toml').read_text(encoding='utf-8')
         self.assertRegex(cargo_toml, r'(?ms)^\[features\]\s+.*^custom-protocol\s*=\s*\[\s*"tauri/custom-protocol"\s*\]')
 
+    def test_activation_import_does_not_depend_on_runtime_current_dir(self):
+        main_rs = (REPO_ROOT / 'src-tauri' / 'src' / 'main.rs').read_text(encoding='utf-8')
+        self.assertNotIn('std::env::current_dir()', main_rs)
+        self.assertIn('include_str!("../../keys/license_priv.pem")', main_rs)
+
     def test_windows_icon_exists_for_tauri_bundle(self):
         self.assertTrue((REPO_ROOT / 'src-tauri' / 'icons' / 'icon.ico').exists())
 
