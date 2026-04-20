@@ -45,6 +45,14 @@ class GitHubReleaseWorkflowTests(unittest.TestCase):
         icons = config['tauri']['bundle'].get('icon', [])
         self.assertIn('icons/icon.ico', icons)
 
+    def test_mac_icon_exists_for_tauri_bundle(self):
+        self.assertTrue((REPO_ROOT / 'src-tauri' / 'icons' / 'icon.icns').exists())
+
+    def test_tauri_bundle_config_references_icns_icon(self):
+        config = json.loads(TAURI_CONFIG_PATH.read_text(encoding='utf-8'))
+        icons = config['tauri']['bundle'].get('icon', [])
+        self.assertIn('icons/icon.icns', icons)
+
 
 if __name__ == '__main__':
     unittest.main()
