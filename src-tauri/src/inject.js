@@ -54,7 +54,6 @@
   const hideEl = (el) => {
     if (!el) return;
     if (el.id === NAV_ID || el.id === MODAL_ID) return;
-    try { el.classList.add('hidden'); } catch (_) {}
     el.style.display = 'none';
     el.style.width = '0';
     el.style.minWidth = '0';
@@ -65,7 +64,6 @@
 
   const hideLayout = () => {
     const selectors = [
-      '.ba-sider',
       '.left-nav', '.left-sidebar', '.bd-layout-sider-left', '.sider-left',
       '.right-panel', '.right-sidebar', '.bd-layout-sider-right', '.works-list', '.history-list',
       '[class*="sidebar"]', '[class*="sider"]', '[class*="left-nav"]', '[class*="right-panel"]'
@@ -80,8 +78,6 @@
     };
 
     selectors.forEach((sel) => document.querySelectorAll(sel).forEach(hideAndCollect));
-
-    document.querySelectorAll('.ba-sider').forEach(hideAndCollect);
 
     // left rail heuristic
     document.querySelectorAll('div,aside,section,nav').forEach((el) => {
@@ -195,19 +191,12 @@
     // Force Lumina main wrapper first child to fill available width.
     const wrapper = document.querySelector('.ba-generate-framework-main-content-wrapper');
     if (wrapper) {
-      wrapper.classList.add('flex-1');
       wrapper.style.width = '100%';
       wrapper.style.maxWidth = 'none';
       wrapper.style.minWidth = '0';
       wrapper.style.marginLeft = '0';
       wrapper.style.marginRight = '0';
       wrapper.style.position = wrapper.style.position || 'relative';
-
-      let sibling = wrapper.nextElementSibling;
-      while (sibling) {
-        if (sibling.tagName === 'DIV') hideEl(sibling);
-        sibling = sibling.nextElementSibling;
-      }
 
       const first = wrapper.querySelector(':scope > div:first-child') || wrapper.firstElementChild;
       if (first) {
@@ -770,7 +759,6 @@
       ensureModal();
       removeLegacyContentGate();
       ensureContentGate();
-      hideLayout();
       wireEvents();
       forceTopNavInteractive();
       refreshContentGateByAuthState();
@@ -786,7 +774,6 @@
     ensureModal();
     removeLegacyContentGate();
     ensureContentGate();
-    hideLayout();
     wireEvents();
     forceTopNavInteractive();
 
@@ -863,7 +850,6 @@
           ensureStyle();
           ensureNav();
           ensureModal();
-          hideLayout();
           wireEvents();
           forceTopNavInteractive();
           refreshContentGateByAuthState();
